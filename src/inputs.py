@@ -3,7 +3,7 @@ import numpy as np
 
 import tensorflow as tf
 
-from src.util import readfile
+from util import readfile
 
 
 def get_file_name(data_dir, subset, suffix='txt'):
@@ -14,10 +14,12 @@ def get_file_name(data_dir, subset, suffix='txt'):
         raise ValueError(f"Invalid data subset {subset}")
 
 
-def input_fn(data_dir, subset, max_doc_len, max_sen_len, batch_size, num_epochs, shuffle=True):
+def input_fn(data_dir, subset, max_doc_len, max_char_sen_len, max_word_sen_len, batch_size,
+             num_epochs, shuffle=True):
     filename = get_file_name(data_dir, subset)
 
-    dataset = get_dataset(filename, max_doc_len, max_sen_len, batch_size, num_epochs, shuffle)
+    dataset = get_dataset(filename, max_char_sen_len, max_word_sen_len, max_doc_len, batch_size,
+                          num_epochs, shuffle)
 
     it = dataset.make_one_shot_iterator()
 
@@ -43,12 +45,14 @@ def get_dataset(filename, max_char_sen_len, max_word_sen_len, max_doc_len, batch
                         max_word_sen_len=max_word_sen_len)
 
     dataset = tf.data.Dataset.from_generator(generator,
-                                             output_types=(tf.int32),
-                                             output_shapes=([None, max_doc_len, max_char_sen_len],
-                                                            [None, max_doc_len, max_word_sen_len],
-                                                            [None, max_doc_len],
-                                                            [None, max_doc_len],
-                                                            [None], [None]))
+                                             output_types=(tf.int32, tf.int32, tf.int32,
+                                                           tf.int32, tf.int32, tf.int32),
+                                             output_shapes=([max_doc_len, max_char_sen_len],
+                                                            [max_doc_len, max_word_sen_len],
+                                                            [max_doc_len],
+                                                            [max_doc_len],
+                                                            [],
+                                                            []))
 
     if shuffle:
         dataset = dataset.shuffle(buffer_size=10000)
