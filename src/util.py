@@ -9,11 +9,12 @@ def load_embedding(filename, dtype=np.float32):
 
 def readline(line):
     tokens = line.strip().split(',')
-    char_sentences = [s.split() for s in tokens[0].split('#')]
+    # char_sentences = [s.split() for s in tokens[0].split('#')]
     word_sentences = [s.split() for s in tokens[1].split('#')]
     label = int(tokens[-1]) - 1
 
-    return char_sentences, word_sentences, label
+    # return char_sentences, word_sentences, label
+    return word_sentences, label
 
 
 def load_table(table_file):
@@ -33,20 +34,24 @@ def readfile(filename, max_doc_len, max_char_sen_len, max_word_sen_len):
     table = load_table(table_file)
     with open(filename, 'r', encoding='UTF-8') as f:
         for line in f:
-            char_sentences, word_sentences, label = readline(line)
+            # char_sentences, word_sentences, label = readline(line)
+            word_sentences, label = readline(line)
 
-            doc_len = len(char_sentences) if len(char_sentences) <= max_doc_len else \
-                max_doc_len
+            word_sentences = word_sentences[:max_doc_len]
+
+            # doc_len = len(word_sentences) if len(char_sentences) <= max_doc_len else \
+            #     max_doc_len
 
             word_sentences = lookup(table, word_sentences)
 
-            char_sentences, char_sen_len = padding(char_sentences,
-                                                   max_doc_len,
-                                                   max_char_sen_len)
+            # char_sentences, char_sen_len = padding(char_sentences,
+            #                                        max_doc_len,
+            #                                        max_char_sen_len)
             word_sentences, word_sen_len = padding(word_sentences,
                                                    max_doc_len,
                                                    max_word_sen_len)
-            yield char_sentences, word_sentences, char_sen_len, word_sen_len, doc_len, label
+            # yield char_sentences, word_sentences, char_sen_len, word_sen_len, doc_len, label
+            yield word_sentences, word_sen_len, label
 
 
 def padding(sentences, max_doc_len, max_sen_len):

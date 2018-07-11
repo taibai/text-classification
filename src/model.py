@@ -17,30 +17,32 @@ def get_eval_metric_ops(predictions, labels):
 def get_model_fn(pretrained_char_embedding, pretrained_word_embedding):
     def model_fn(features, labels, mode, params):
         # (batch_size, doc_len, seq_len, dim)
-        char_sentences = features['char_sentences']
-        char_sen_len = features['char_sen_len']
+        # char_sentences = features['char_sentences']
+        # char_sen_len = features['char_sen_len']
         word_sentences = features['word_sentences']
         word_sen_len = features['word_sen_len']
         doc_len = features['doc_len']
 
-        char_sen_len = tf.reshape(char_sen_len, shape=[-1])
-        char_sentences = tf.reshape(char_sentences, shape=[-1, params.max_char_sen_len])
+        batch_size = tf.shape(word_sen_len)[0]
 
-        char_embedding_ph = tf.placeholder(shape=pretrained_char_embedding.shape,
-                                           dtype=pretrained_char_embedding.dtype)
+        # char_sen_len = tf.reshape(char_sen_len, shape=[-1])
+        # char_sentences = tf.reshape(char_sentences, shape=[-1, params.max_char_sen_len])
 
-        char_embedding = tf.get_variable('char_embedding', initializer=char_embedding_ph,
-                                         trainable=False)
+        # char_embedding_ph = tf.placeholder(shape=pretrained_char_embedding.shape,
+        #                                    dtype=pretrained_char_embedding.dtype)
 
-        char_inputs = tf.nn.embedding_lookup(char_embedding, char_sentences)
+        # char_embedding = tf.get_variable('char_embedding', initializer=char_embedding_ph,
+        #                                  trainable=False)
 
-        char_bilstm_outputs = bilstm(char_inputs, char_sen_len, params.num_char_hidden_units,
-                                     name='char_bilstm')
+        # char_inputs = tf.nn.embedding_lookup(char_embedding, char_sentences)
 
-        char_att_outputs = attention(char_bilstm_outputs, units=params.char_attention_units,
-                                     name="char_sen_att")
+        # char_bilstm_outputs = bilstm(char_inputs, char_sen_len, params.num_char_hidden_units,
+        #                              name='char_bilstm')
 
-        char_dropout = tf.nn.dropout(char_att_outputs, keep_prob=params.dropout_char_keep_prob)
+        # char_att_outputs = attention(char_bilstm_outputs, units=params.char_attention_units,
+        #                              name="char_sen_att")
+
+        # char_dropout = tf.nn.dropout(char_att_outputs, keep_prob=params.dropout_char_keep_prob)
 
         word_embedding_ph = tf.placeholder(shape=pretrained_word_embedding.shape,
                                            dtype=pretrained_word_embedding.dtype)
@@ -60,7 +62,8 @@ def get_model_fn(pretrained_char_embedding, pretrained_word_embedding):
 
         word_dropout = tf.nn.dropout(word_att_outputs, keep_prob=params.dropout_word_keep_prob)
 
-        outputs = merge(char_dropout, word_dropout, params)
+        # outputs = merge(char_dropout, word_dropout, params)
+        outputs = tf.reshape(word_dropout, shape=[batch_size, -1, 2 * params.num_word_hidden_units])
 
         outputs = bilstm(outputs, doc_len, params.num_doc_hidden_units, name='document_bilstm')
 
@@ -103,8 +106,9 @@ def get_model_fn(pretrained_char_embedding, pretrained_word_embedding):
             train_op=train_op,
             export_outputs=export_outputs,
             eval_metric_ops=eval_metric_ops,
-            scaffold=tf.train.Scaffold(init_feed_dict={word_embedding_ph: pretrained_word_embedding,
-                                                       char_embedding_ph: pretrained_char_embedding})
+            scaffold=tf.train.Scaffold(init_feed_dict={word_embedding_ph:
+                                                           pretrained_word_embedding})
+                                                       # char_embedding_ph: pretrained_char_embedding})
         )
 
     return model_fn
