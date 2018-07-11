@@ -88,6 +88,8 @@ def get_model_fn(pretrained_char_embedding, pretrained_word_embedding):
 
         if mode in (tf.estimator.ModeKeys.TRAIN, tf.estimator.ModeKeys.EVAL):
 
+            labels = tf.cast(labels, dtype=tf.int32)
+
             y = tf.one_hot(labels, params.num_classes)
 
             with tf.variable_scope("losses"):

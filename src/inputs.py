@@ -3,11 +3,13 @@ import numpy as np
 
 import tensorflow as tf
 
-from util import readfile
+from util import readfile, parse_fn
 
 
 def bucketing(dataset, mini_batch_size):
-    word_sentences_batch, word_sen_len_batch, label_batch = dataset.make_one_shot_iterator().get_next()
+    word_sentences_batch, word_sen_len_batch, label_batch = dataset.make_one_shot_iterator(
+
+    ).get_next()
 
     with tf.variable_scope("bucketing"):
         _batch_size = tf.get_variable(name='mini_batch_size',
@@ -31,7 +33,6 @@ def bucketing(dataset, mini_batch_size):
             "doc_len": doc_len,
         }
 
-
         return features, labels
 
 
@@ -45,10 +46,13 @@ def get_file_name(data_dir, subset, suffix='txt'):
 
 def input_fn(data_dir, subset, max_doc_len, max_char_sen_len, max_word_sen_len, batch_size,
              num_epochs, shuffle=True):
-    filename = get_file_name(data_dir, subset)
+    filename = get_file_name(data_dir, subset, suffix='tfrecord')
 
-    dataset = get_dataset(filename, max_char_sen_len, max_word_sen_len, max_doc_len,
-                          num_epochs, shuffle)
+    # dataset = get_dataset(filename, max_char_sen_len, max_word_sen_len, max_doc_len,
+    #                       num_epochs, shuffle)
+
+    dataset = get_dataset_from_tfrecord_file(filename, max_char_sen_len, max_word_sen_len,
+                                             max_doc_len, num_epochs, shuffle)
 
     return bucketing(dataset, batch_size)
 
@@ -79,6 +83,19 @@ def get_dataset(filename, max_char_sen_len, max_word_sen_len, max_doc_len, num_e
 
     dataset = dataset.repeat(num_epochs)
 
+    dataset = dataset.prefetch(1)
+
+    return dataset
+
+
+def get_dataset_from_tfrecord_file(filename, max_char_sen_len, max_word_sen_len, max_doc_len,
+                                   num_epochs, shuffle):
+    dataset = tf.data.TFRecordDataset([filename])
+    dataset = dataset.map(parse_fn)
+
+    if shuffle:
+        dataset = dataset.shuffle(buffer_size=10000)
+    dataset = dataset.repeat(num_epochs)
     dataset = dataset.prefetch(1)
 
     return dataset

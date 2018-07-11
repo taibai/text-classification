@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import tensorflow as tf
 
 
 def load_embedding(filename, dtype=np.float32):
@@ -39,7 +40,7 @@ def readfile(filename, max_doc_len, max_char_sen_len, max_word_sen_len):
 
             word_sentences = word_sentences[:max_doc_len]
 
-            # doc_len = len(word_sentences) if len(char_sentences) <= max_doc_len else \
+            # doc_len = len(word_sentences) if len(word_sentences) <= max_doc_len else \
             #     max_doc_len
 
             word_sentences = lookup(table, word_sentences)
@@ -67,15 +68,56 @@ def padding(sentences, max_doc_len, max_sen_len):
     return np.array(sentences, dtype=np.int32), np.array(sen_len, dtype=np.int32)
 
 
+def make_tfrecord_file(raw, max_doc_len, max_char_sen_len, max_word_sen_len, output):
+    def _int64_feature(value):
+        return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
+    def _bytes_feature(value):
+        return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+    writer = tf.python_io.TFRecordWriter(output)
+    for word_sentences, word_sen_len, label in readfile(raw, max_doc_len, max_char_sen_len,
+                                                        max_word_sen_len):
+        example = tf.train.Example(features=tf.train.Features(
+            feature={
+                'word_sentences': tf.train.Feature(
+                    bytes_list=tf.train.BytesList(value=[word_sentences.tostring()])),
+                'word_sentences_shape': tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=word_sentences.shape)),
+                'word_sen_len': tf.train.Feature(
+                    bytes_list=tf.train.BytesList(value=[word_sen_len.tostring()])),
+                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
+            }
+        ))
+
+        serialized = example.SerializeToString()
+
+        writer.write(serialized)
+
+    writer.close()
+
+
+def parse_fn(example_proto):
+    dics = {
+        'word_sentences': tf.FixedLenFeature(shape=(), dtype=tf.string),
+        'word_sen_len': tf.FixedLenFeature(shape=(), dtype=tf.string),
+        'word_sentences_shape': tf.FixedLenFeature(shape=(2, ), dtype=tf.int64),
+        'label': tf.FixedLenFeature(shape=(), dtype=tf.int64),
+    }
+
+    parsed_example = tf.parse_single_example(example_proto, dics)
+
+    parsed_example['word_sentences'] = tf.decode_raw(parsed_example['word_sentences'], tf.int32)
+    parsed_example['word_sen_len'] = tf.decode_raw(parsed_example['word_sen_len'], tf.int32)
+
+    parsed_example['word_sentences'] = tf.reshape(parsed_example['word_sentences'],
+                                                  shape=parsed_example['word_sentences_shape'])
+    return parsed_example['word_sentences'], parsed_example['word_sen_len'], parsed_example[
+        'label']
+
+
 if __name__ == '__main__':
-    filename = 'data/train.txt'
 
-    count = 0
-    try:
-        for char_sentences, word_sentences, char_sen_len, word_sen_len, doc_len, label in readfile(
-                filename, 128, 750, 175):
-            count += 1
-    except:
-        print(count)
+    for filename in ('data/train.txt', 'data/eval.txt'):
 
-    print(count)
+        make_tfrecord_file(filename, 128, 750, 175, 'data/train.tfrecord')
