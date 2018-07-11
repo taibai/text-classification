@@ -45,9 +45,6 @@ def train(*args):
     train_input_fn = functools.partial(input_fn,
                                        data_dir=FLAGS.data_dir,
                                        subset='train',
-                                       max_doc_len=params.max_doc_len,
-                                       max_char_sen_len=params.max_char_sen_len,
-                                       max_word_sen_len=params.max_word_sen_len,
                                        batch_size=params.batch_size,
                                        num_epochs=None,
                                        shuffle=True)
@@ -55,9 +52,6 @@ def train(*args):
     eval_input_fn = functools.partial(input_fn,
                                       data_dir=FLAGS.data_dir,
                                       subset='eval',
-                                      max_doc_len=params.max_doc_len,
-                                      max_char_sen_len=params.max_char_sen_len,
-                                      max_word_sen_len=params.max_word_sen_len,
                                       batch_size=params.batch_size,
                                       num_epochs=None,
                                       shuffle=False)
@@ -75,7 +69,7 @@ def train(*args):
 
     exporter = tf.estimator.FinalExporter(
         "classsification",
-        get_serving_input_fn(params.max_doc_len, params.max_char_sen_len, params.max_word_sen_len)
+        get_serving_input_fn()
     )
 
     eval_spec = tf.estimator.EvalSpec(
