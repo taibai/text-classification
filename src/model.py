@@ -90,9 +90,10 @@ def get_model_fn(pretrained_char_embedding, pretrained_word_embedding):
 
             y = tf.one_hot(labels, params.num_classes)
 
-            with tf.name_scope("loss"):
+            with tf.variable_scope("losses"):
                 loss = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y)
                 loss = tf.reduce_mean(loss)
+                loss = tf.identity(loss, name='loss')
                 if mode == tf.estimator.ModeKeys.TRAIN:
                     with tf.name_scope("optimizer"):
                         train_op = get_train_op(loss, params.learning_rate)
@@ -163,9 +164,9 @@ def bilstm(inputs, sequence_length, num_hidden_units, name):
 
 def get_serving_input_fn(max_doc_len, max_char_sen_len, max_word_sen_len):
     features = {
-        "char_sentences": tf.placeholder(dtype=tf.int32, shape=[None, max_doc_len,
-                                                                max_char_sen_len]),
-        "char_sen_len": tf.placeholder(dtype=tf.int32, shape=[None, max_doc_len]),
+        # "char_sentences": tf.placeholder(dtype=tf.int32, shape=[None, max_doc_len,
+        #                                                         max_char_sen_len]),
+        # "char_sen_len": tf.placeholder(dtype=tf.int32, shape=[None, max_doc_len]),
         "word_sentences": tf.placeholder(dtype=tf.int32, shape=[None, max_doc_len,
                                                                 max_word_sen_len]),
         "word_sen_len": tf.placeholder(dtype=tf.int32, shape=[None, max_doc_len]),
