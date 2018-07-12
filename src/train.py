@@ -1,6 +1,5 @@
 import functools
 import os
-import sys
 
 import tensorflow as tf
 
@@ -39,7 +38,6 @@ def train(*args):
         session_config=session_config
     )
 
-    pretrained_char_embedding = load_embedding(os.path.join(FLAGS.data_dir, "char_embedding.npy"))
     pretrained_word_embedding = load_embedding(os.path.join(FLAGS.data_dir, "word_embedding.npy"))
 
     train_input_fn = functools.partial(input_fn,
@@ -57,7 +55,7 @@ def train(*args):
                                       shuffle=False)
 
     estimator = tf.estimator.Estimator(
-        model_fn=get_model_fn(pretrained_char_embedding, pretrained_word_embedding),
+        model_fn=get_model_fn(pretrained_word_embedding),
         params=params,
         config=run_config
     )
@@ -83,4 +81,4 @@ def train(*args):
 
 
 if __name__ == '__main__':
-    tf.app.run(train, argv=[sys.argv[0]])
+    tf.app.run(main=train)

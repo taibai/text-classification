@@ -9,11 +9,23 @@ def get_eval_metric_ops(predictions, labels):
     }
 
 
-def get_model_fn(pretrained_char_embedding, pretrained_word_embedding):
+def get_model_fn(pretrained_word_embedding):
     def model_fn(features, labels, mode, params):
 
-        words = features['words']
-        word_seq_len = features['word_seq_len']
+        def arch(inputs, num_hidden_units, num_attention_units, keep_prob, name):
+            with tf.variable_scope(name):
+                inputs = tf.nn.embedding_lookup(word_embedding, inputs)
+                outputs = bilstm(inputs, seq_len, num_hidden_units,
+                                 name='bilstm')
+                outputs = attention(outputs, units=num_attention_units,
+                                    name="attention")
+                if mode == tf.estimator.ModeKeys.TRAIN:
+                    outputs = tf.nn.dropout(outputs, keep_prob)
+                return outputs
+
+        head = features['head']
+        tail = features['tail']
+        seq_len = features['seq_len']
 
         word_embedding_ph = tf.placeholder(shape=pretrained_word_embedding.shape,
                                            dtype=pretrained_word_embedding.dtype)
@@ -21,18 +33,17 @@ def get_model_fn(pretrained_char_embedding, pretrained_word_embedding):
         word_embedding = tf.get_variable('word_embedding', initializer=word_embedding_ph,
                                          trainable=False)
 
-        word_inputs = tf.nn.embedding_lookup(word_embedding, words)
-        word_bilstm_outputs = bilstm(word_inputs, word_seq_len, params.num_word_hidden_units,
-                                     name='word_bilstm')
+        head_outputs = arch(head, params.head_hidden_units, params.head_attention_units,
+                            params.head_keep_prob)
+        tail_outputs = arch(tail, params.tail_hidden_units, params.tail_attention_units,
+                            params.tail_keep_prob)
 
-        word_att_outputs = attention(word_bilstm_outputs, units=params.word_attention_units,
-                                     name="word_sen_att")
+        outputs = tf.concat((head_outputs, tail_outputs), -1)
 
-        word_dropout_outputs = tf.nn.dropout(word_att_outputs,
-                                             keep_prob=params.dropout_word_keep_prob)
+        outputs = attention(outputs, params.attention_units, name='global_attention')
 
         with tf.name_scope('predict'):
-            logits = tf.layers.dense(word_dropout_outputs, units=params.num_classes, use_bias=True)
+            logits = tf.layers.dense(outputs, units=params.num_classes, use_bias=True)
 
             predictions = {
                 'class': tf.argmax(tf.nn.softmax(logits), -1),
@@ -69,9 +80,8 @@ def get_model_fn(pretrained_char_embedding, pretrained_word_embedding):
             train_op=train_op,
             export_outputs=export_outputs,
             eval_metric_ops=eval_metric_ops,
-            scaffold=tf.train.Scaffold(init_feed_dict={word_embedding_ph:
-                                                           pretrained_word_embedding})
-            # char_embedding_ph: pretrained_char_embedding})
+            scaffold=tf.train.Scaffold(
+                init_feed_dict={word_embedding_ph: pretrained_word_embedding})
         )
 
     return model_fn
@@ -84,17 +94,6 @@ def get_train_op(loss, learning_rate):
         optimizer=tf.train.AdamOptimizer,
         learning_rate=learning_rate
     )
-
-
-def merge(char_att_outputs, word_att_outputs, params):
-    char_inputs = tf.reshape(char_att_outputs,
-                             shape=[-1, params.max_doc_len,
-                                    2 * params.num_char_hidden_units])
-    word_inputs = tf.reshape(word_att_outputs,
-                             shape=[-1, params.max_doc_len,
-                                    2 * params.num_word_hidden_units])
-    outputs = tf.concat((char_inputs, word_inputs), axis=-1)
-    return outputs
 
 
 def attention(inputs, units, name):

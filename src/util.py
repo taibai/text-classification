@@ -10,16 +10,17 @@ def load_embedding(filename, dtype=np.float32):
 
 def readline(line):
     tokens = line.strip().split(',')
-    words = tokens[1].split()
+    head = tokens[0].split()
+    tail = tokens[1].split()
     label = int(tokens[-1]) - 1
 
     # return char_sentences, word_sentences, label
-    return words, label
+    return head, tail, label
 
 
 def load_table(table_file):
     with open(table_file, 'r', encoding='UTF-8') as f:
-        return {key: value for key, value in map(lambda x: x.strip().split(), f)}
+        return {key: int(value) for key, value in map(lambda x: x.strip().split(), f)}
 
 
 def lookup(table, ids):
@@ -34,29 +35,19 @@ def readfile(filename):
     table = load_table(table_file)
     with open(filename, 'r', encoding='UTF-8') as f:
         for line in f:
-            # char_sentences, word_sentences, label = readline(line)
-            words, label = readline(line)
-
-            # doc_len = len(word_sentences) if len(word_sentences) <= max_doc_len else \
-            #     max_doc_len
-
-            words = lookup(table, words)
-
-            # char_sentences, char_sen_len = padding(char_sentences,
-            #                                        max_doc_len,
-            #                                        max_char_sen_len)
-
-            # yield char_sentences, word_sentences, char_sen_len, word_sen_len, doc_len, label
-            yield np.array(words, dtype=np.int32), label
+            head, tail, label = readline(line)
+            yield lookup(table, head), lookup(table, tail), label
 
 
 def make_tfrecord_file(raw, output):
     writer = tf.python_io.TFRecordWriter(output)
-    for words, label in readfile(raw):
+    for head, tail, label in readfile(raw):
         example = tf.train.Example(features=tf.train.Features(
             feature={
-                'words': tf.train.Feature(
-                    bytes_list=tf.train.BytesList(value=[words.tostring()])),
+                'head': tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=head)),
+                'tail': tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=tail)),
                 'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
             }
         ))
@@ -70,14 +61,17 @@ def make_tfrecord_file(raw, output):
 
 def parse_fn(example_proto):
     dics = {
-        'words': tf.FixedLenFeature(shape=(), dtype=tf.int64),
+        'head': tf.VarLenFeature(dtype=tf.int64),
+        'tail': tf.VarLenFeature(dtype=tf.int64),
         'label': tf.FixedLenFeature(shape=(), dtype=tf.int64),
     }
 
     parsed_example = tf.parse_single_example(example_proto, dics)
 
+    head = tf.sparse_tensor_to_dense(parsed_example['head'])
+    tail = tf.sparse_tensor_to_dense(parsed_example['tail'])
 
-    return parsed_example['words'], parsed_example['label']
+    return head, tail, parsed_example['label']
 
 
 if __name__ == '__main__':

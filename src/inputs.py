@@ -7,7 +7,7 @@ from util import readfile, parse_fn
 
 
 def bucketing(dataset, mini_batch_size):
-    words_batch, label_batch = dataset.make_one_shot_iterator().get_next()
+    head_batch, tail_batch, label_batch = dataset.make_one_shot_iterator().get_next()
 
     with tf.variable_scope("bucketing"):
         _batch_size = tf.get_variable(name='mini_batch_size',
@@ -16,17 +16,18 @@ def bucketing(dataset, mini_batch_size):
                                       trainable=False)
         _batch_size = tf.assign(ref=_batch_size, value=mini_batch_size)
 
-        word_seq_len, [words, labels] = tf.contrib.training.bucket_by_sequence_length(
-            input_length=tf.shape(words_batch)[0],
-            tensors=[words_batch, label_batch],
+        seq_len, [head, tail, labels] = tf.contrib.training.bucket_by_sequence_length(
+            input_length=tf.shape(head_batch)[0],
+            tensors=[head_batch, tail_batch, label_batch],
             batch_size=_batch_size,
             bucket_boundaries=[10, 30, 50, 80, 110],
             dynamic_pad=True,
         )
 
         features = {
-            "words": words,
-            "word_seq_len": word_seq_len,
+            "head": head,
+            "tail": tail,
+            "seq_len": seq_len,
         }
 
         return features, labels
@@ -41,9 +42,9 @@ def get_file_name(data_dir, subset, suffix='txt'):
 
 
 def input_fn(data_dir, subset, batch_size, num_epochs, shuffle=True):
-    filename = get_file_name(data_dir, subset)
+    filename = get_file_name(data_dir, subset, suffix='tfrecord')
 
-    dataset = get_dataset(filename, num_epochs, shuffle)
+    dataset = get_dataset_from_tfrecord_file(filename, num_epochs, shuffle)
 
     return bucketing(dataset, batch_size)
 
